@@ -1,0 +1,3 @@
+[submodule "models/nanoGPT"]
+	path = models/nanoGPT
+	url = https://github.com/karpathy/nanoGPT.git
