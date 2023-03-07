@@ -13,7 +13,6 @@ class MosaicNegOPTBase(composer_models.ComposerModel):
         super().__init__()
         self.model = transformers.OPTForCausalLM.from_pretrained(pretrained_model)
         self.perplex = composer_metrics.Perplexity()
-        setattr(self.perplex, "set_dtype", lambda x: None)
 
     def loss(self, outputs, batch, *args, **kwargs):
         """Accepts the outputs from forward() and the batch"""

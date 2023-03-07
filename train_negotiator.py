@@ -12,7 +12,7 @@ opt_tokenizer = AutoTokenizer.from_pretrained("facebook/opt-350m", use_fast=Fals
 
 casino = load_dataset("casino")
 
-BATCH_SIZE = 4
+BATCH_SIZE = 1
 
 
 def main():
@@ -42,13 +42,15 @@ def main():
         train_dataloader=train_dataloader,
         eval_dataloader=eval_dataloader,
         optimizers=optimizer,
-        max_duration=4,
+        max_duration=1,
         device=device,
-        train_subset_num_batches=1,  # !!!
+        log_to_console=True,
+        console_log_interval=1,
         save_folder="./models/negOPT_checkpoints/",
         save_filename="ep{epoch}.pt",
-        save_latest_filename="latest",
+        save_latest_filename="latest.pt",
         save_overwrite=True,
+        train_subset_num_batches=-1,  # !!!
     )
 
     trainer.fit()
