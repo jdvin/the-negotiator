@@ -1,6 +1,7 @@
 from collections import defaultdict
 from matplotlib import pyplot as plt
 import torch
+from torch.utils import data as data_utils
 import typing as tp
 import transformers
 import tqdm
@@ -63,6 +64,53 @@ class CasinoDatasetIntegrated:
             "attention_mask": attention_mask,  # .unsqueeze(0),
             "labels": self.labels[idx],  # .unsqueeze(0),
         }
+
+    def __len__(self):
+        return len(self.inputs["input_ids"])
+
+
+class IterableCasinoDataset(data_utils.IterableDataset):
+    def __init__(
+        self,
+        tokenizer: transformers.PreTrainedTokenizer,
+        self_prompts: tp.List[str],
+        chat_logs: tp.List[str],
+        max_len: int = 512,
+    ):
+        """
+        Others
+            - https://lightning-transformers.readthedocs.io/en/latest/tasks/nlp/language_modeling.html
+        """
+        combined_inputs = [
+            self_prompt + chat_log
+            for self_prompt, chat_log in zip(self_prompts, chat_logs)
+        ]
+
+        self.inputs = tokenizer(
+            combined_inputs,
+            return_tensors="pt",
+            truncation=True,
+            padding=True,
+            max_length=max_len,
+        )
+
+        # We will not be predicting the first token, so remove it and add extra padding to the end.
+        # ? Is this the correct way to go about this?
+        self.labels = torch.concat(
+            (
+                self.inputs["input_ids"][:, 1:],
+                torch.full(
+                    size=(self.inputs["input_ids"].size(0), 1),
+                    fill_value=tokenizer.pad_token_id,
+                ),
+            ),
+            dim=1,
+        )
+
+    def __iter__(self):
+        return iter(
+            zip(self.inputs["input_ids"], self.inputs["attention_mask"], self.labels)
+        )
 
     def __len__(self):
         return len(self.inputs["input_ids"])
@@ -137,6 +185,7 @@ def prepare_casino_data(casino_raw: any) -> dict:
         data["chat_logs"].extend(row_data["self_prompts"])
     return data
 
+
 def generate_dataset_splits(
     tokenizer,
     processed_casino: dict,
@@ -147,27 +196,25 @@ def generate_dataset_splits(
 
     train_n = int((1 - test_frac) * len(processed_casino["self_prompts"]))
 
-    casino_train_data = CasinoDatasetIntegrated(
+    casino_train_data = IterableCasinoDataset(
         tokenizer=tokenizer,
         self_prompts=processed_casino["self_prompts"][:train_n],
         chat_logs=processed_casino["chat_logs"][:train_n],
         max_len=max_len,
-        batch_size=batch_size,
     )
-    casino_test_data = CasinoDatasetIntegrated(
+    casino_test_data = IterableCasinoDataset(
         tokenizer=tokenizer,
         self_prompts=processed_casino["self_prompts"][train_n:],
         chat_logs=processed_casino["chat_logs"][train_n:],
         max_len=max_len,
-        batch_size=batch_size,
     )
 
     return casino_train_data, casino_test_data
 
 
-def plot_input_lengths(data, tokenizer): 
+def plot_input_lengths(data, tokenizer):
     lengths = [
-        len(tokenizer(self_prompt + chat_log)['input_ids'])
+        len(tokenizer(self_prompt + chat_log)["input_ids"])
         for self_prompt, chat_log in zip(data["self_prompts"], data["chat_logs"])
     ]
 

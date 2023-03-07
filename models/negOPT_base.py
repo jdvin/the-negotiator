@@ -17,9 +17,10 @@ class MosaicNegOPTBase(composer_models.ComposerModel):
 
     def loss(self, outputs, batch, *args, **kwargs):
         """Accepts the outputs from forward() and the batch"""
-        # Flatten logits and targets (required by F.cross_entropy).
+        # Flatten logits and labels (required by F.cross_entropy).
+        _, _, labels = batch
         flat_logits = outputs.view(-1, outputs.size(-1))
-        flat_targets = batch["labels"].view(-1)
+        flat_targets = labels.view(-1)
 
         return F.cross_entropy(flat_logits, flat_targets)
 
@@ -28,7 +29,9 @@ class MosaicNegOPTBase(composer_models.ComposerModel):
 
     def forward(self, batch):
 
-        y = self.model(**batch).logits
+        input_ids, attention_mask, _ = batch
+
+        y = self.model(input_ids, attention_mask).logits
         return F.log_softmax(y, dim=1)
 
     def eval_forward(self, batch, outputs=None):
@@ -36,6 +39,7 @@ class MosaicNegOPTBase(composer_models.ComposerModel):
 
     def update_metric(self, batch, outputs, metric) -> None:
         # Flatten logits and targets (required by F.cross_entropy).
+        _, _, labels = batch
         flat_logits = outputs.view(-1, outputs.size(-1))
-        flat_targets = batch["labels"].view(-1)
+        flat_targets = labels.view(-1)
         metric.update(flat_logits, flat_targets)
